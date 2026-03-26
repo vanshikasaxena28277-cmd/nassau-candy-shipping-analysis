@@ -1,54 +1,95 @@
 import streamlit as st
 import pandas as pd
 
-st.title("Shipping Route Efficiency Dashboard")
+st.title("🍬 Shipping Route Efficiency Dashboard")
 
-# Load data (use your exact file name)
+# Load data
 df = pd.read_csv("Nassau Candy Distributor.csv")
 
-# Convert dates safely
+# Fix dates safely
 df['Order Date'] = pd.to_datetime(df['Order Date'], errors='coerce')
 df['Ship Date'] = pd.to_datetime(df['Ship Date'], errors='coerce')
 
-# Drop invalid dates
 df = df.dropna(subset=['Order Date', 'Ship Date'])
 
-# Create Lead Time
+# Lead time
 df['Lead Time'] = (df['Ship Date'] - df['Order Date']).dt.days
 
-# Sidebar filters
+# ----------------------------
+# Factory Mapping (IMPORTANT)
+# ----------------------------
+product_factory = {
+    "Wonka Bar - Nutty Crunch Surprise": "Lot's O' Nuts",
+    "Wonka Bar - Fudge Mallows": "Lot's O' Nuts",
+    "Wonka Bar -Scrumdiddlyumptious": "Lot's O' Nuts",
+    "Wonka Bar - Milk Chocolate": "Wicked Choccy's",
+    "Wonka Bar - Triple Dazzle Caramel": "Wicked Choccy's",
+    "Laffy Taffy": "Sugar Shack",
+    "SweeTARTS": "Sugar Shack",
+    "Nerds": "Sugar Shack",
+    "Fun Dip": "Sugar Shack",
+    "Fizzy Lifting Drinks": "Sugar Shack",
+    "Everlasting Gobstopper": "Secret Factory",
+    "Lickable Wallpaper": "Secret Factory",
+    "Wonka Gum": "Secret Factory",
+    "Hair Toffee": "The Other Factory",
+    "Kazookles": "The Other Factory"
+}
+
+df["Factory"] = df["Product Name"].map(product_factory)
+
+# Route column
+df["Route"] = df["Factory"] + " → " + df["State/Province"]
+
+# ----------------------------
+# Sidebar Filters
+# ----------------------------
 st.sidebar.header("Filters")
 
-region = st.sidebar.multiselect("Select Region", df['Region'].unique())
-ship_mode = st.sidebar.multiselect("Select Ship Mode", df['Ship Mode'].unique())
+region = st.sidebar.multiselect("Region", df["Region"].unique())
+ship_mode = st.sidebar.multiselect("Ship Mode", df["Ship Mode"].unique())
 
-# Apply filters
 if region:
-    df = df[df['Region'].isin(region)]
+    df = df[df["Region"].isin(region)]
 
 if ship_mode:
-    df = df[df['Ship Mode'].isin(ship_mode)]
+    df = df[df["Ship Mode"].isin(ship_mode)]
 
-# Show data
-st.subheader("Dataset Preview")
-st.write(df.head())
+# ----------------------------
+# KPIs
+# ----------------------------
+st.subheader("Key Metrics")
 
-# Average Lead Time by State
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Total Orders", len(df))
+col2.metric("Average Lead Time", f"{df['Lead Time'].mean():.1f} days")
+col3.metric("Max Lead Time", f"{df['Lead Time'].max()} days")
+
+# ----------------------------
+# Route Analysis
+# ----------------------------
+route_df = df.groupby("Route")["Lead Time"].mean().sort_values()
+
+st.subheader("Top 10 Fastest Routes")
+st.write(route_df.head(10))
+
+st.subheader("Top 10 Slowest Routes")
+st.write(route_df.tail(10))
+
+# ----------------------------
+# Charts
+# ----------------------------
 st.subheader("Average Lead Time by State")
-state_avg = df.groupby('State/Province')['Lead Time'].mean().sort_values()
+state_avg = df.groupby("State/Province")["Lead Time"].mean()
 st.bar_chart(state_avg)
 
-# Ship Mode Comparison
 st.subheader("Ship Mode Comparison")
-mode_avg = df.groupby('Ship Mode')['Lead Time'].mean()
+mode_avg = df.groupby("Ship Mode")["Lead Time"].mean()
 st.bar_chart(mode_avg)
 
-# Fastest Routes
-st.subheader("Top 10 Fastest Routes")
-fast_routes = df.groupby(['Region', 'State/Province'])['Lead Time'].mean().nsmallest(10)
-st.write(fast_routes)
-
-# Slowest Routes
-st.subheader("Top 10 Slowest Routes")
-slow_routes = df.groupby(['Region', 'State/Province'])['Lead Time'].mean().nlargest(10)
-st.write(slow_routes)
+# ----------------------------
+# Data Preview
+# ----------------------------
+st.subheader("Dataset Preview")
+st.write(df.head())
